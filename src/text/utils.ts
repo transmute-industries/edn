@@ -227,7 +227,8 @@ export const unwrap = (content: string) => {
     data.tag = parseInt(tag, 10)
   }
   if (data === undefined){
-    throw new Error('Failed to parse EDN.')
+    throw new Error('Failed to parse EDN for ' + content)
   }
+ 
   return data
 }
