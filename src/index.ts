@@ -1,7 +1,5 @@
 
-
-import { diagnose } from 'cbor'
-
-export { diagnose }
-
+import * as cbor from 'cbor'
+export { cbor }
 export * from './text'
+export * from './parse'
