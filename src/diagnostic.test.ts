@@ -10,20 +10,20 @@ it('simple object', async ()=>{
   const diag = await edn.diagnose(encoded)
   expect(diag).toBe(`{"hello": ["string", 0, false], "hello2": h'facade'}
 `);
-  // const parsed = edn.parse(diag)
-  // console.log(parsed)
+  const parsed = edn.parse<edn.MapLike>(diag)
+  const item = edn.getMapKeyFromLabel(parsed, 'hello')
+  expect(item[0].get('label')).toBe('string')
+  expect(item[1].get('label')).toBe(0)
 })
 
-it('simple array', async ()=>{
+it('nested arrays', async ()=>{
   const encoded = encode(['string', 0, false, ['deep', ['nested']]])
   const diag = await edn.diagnose(encoded)
   expect(diag).toBe(`["string", 0, false, ["deep", ["nested"]]]
 `);
-  const parsed = edn.parse(diag) as any
-  // console.log(parsed)
-  // console.log(diag)
-
-  console.log(parsed[3])
+  const parsed = edn.parse<edn.Sequence>(diag)
+  expect(parsed[3][0].get('label')).toBe('deep')
+  expect(parsed[3][1][0].get('label')).toBe('nested')
 })
 
 
