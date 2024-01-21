@@ -10,7 +10,15 @@ const isMap = (content: string) => content.startsWith('{') && content.endsWith('
 const isSeq = (content: string) => content.startsWith('[') && content.endsWith(']')
 
 const isBytes = (content: string) => content.startsWith(`h'`) && content.endsWith(`'`)
+const isTextString = (content: string) => content.startsWith(`"`) && content.endsWith(`"`)
 
+const isNumber = (content: string) => {
+  return `${parseInt(content, 10)}` === content
+}
+
+const isBoolean = (content: string) => {
+  return ['true', 'false'].includes(content)
+}
 
 const getSymbolBefore = (content: string, symbol: string) => {
   let indexOfSymbol = content.indexOf(symbol);
@@ -37,8 +45,8 @@ const selectBoundedText = (content: string, start: string, end: string) => {
   return text;
 }
 
-
 const selectNextValue = (content: string) => {
+  content = removeFirstComma(content)
   if (content.startsWith('[')) {
     return selectBoundedText(content, '[', ']')
   }
@@ -72,7 +80,7 @@ class EDNLabel {
 
 export class EDNMap {
   public entries = [] as any[]
-  addEntry(key: any, value: any) {
+  add(key: any, value: any) {
     this.entries.push([key, value])
   }
 
@@ -86,8 +94,11 @@ export class EDNMap {
 
 export class EDNSeq {
   public entries = [] as any[]
-  addEntry(value: any) {
+  add(value: any) {
     this.entries.push(value)
+  }
+  get(index: number){
+    return this.entries[index]
   }
 }
 
@@ -99,13 +110,38 @@ class EDNBytes {
   }
 }
 
+class EDNNumber {
+  public value: number
+  // h'facade'
+  constructor(value: string) {
+    this.value = parseInt(value, 10)
+  }
+}
+
+class EDNBoolean {
+  public value: boolean
+  // h'facade'
+  constructor(value: string) {
+    this.value = value === 'true'
+  }
+}
+
+
+
+class EDNTextString {
+  constructor(public value: string) {
+    if (`${value}`.startsWith('"')){
+      this.value = `${value}`.slice(1, `${value}`.length-1)
+    }
+  }
+}
+
 const removeFirstComma = (text: string) => {
   if (text.trim().startsWith(',')) {
     return text.trim().slice(1)
   }
   return text.trim();
 }
-
 
 const unwrapSeq = (content: string) => {
   if (!isSeq(content)) {
@@ -116,7 +152,7 @@ const unwrapSeq = (content: string) => {
   while (unwrapped.length) {
     const value = selectNextValue(unwrapped)
     if (value.length) {
-      seq.addEntry(unwrap(value))
+      seq.add(unwrap(value))
       unwrapped = unwrapped.replace(value, '')
     }
     unwrapped = removeFirstComma(unwrapped)
@@ -135,14 +171,13 @@ const unwrapMap = (content: string) => {
     unwrapped = unwrapped.replace(`${label}: `, '').trim()
     const value = selectNextValue(unwrapped)
     if (value.length) {
-      map.addEntry(new EDNLabel(label), unwrap(value))
+      map.add(new EDNLabel(label), unwrap(value))
       unwrapped = unwrapped.replace(value, '')
       unwrapped = removeFirstComma(unwrapped)
     }
   }
   return map;
 }
-
 
 export const unwrap = (content: string) => {
   if (isMap(content)) {
@@ -154,5 +189,15 @@ export const unwrap = (content: string) => {
   if (isBytes(content)) {
     return new EDNBytes(content)
   }
+  if (isTextString(content)) {
+    return new EDNTextString(content)
+  }
+  if (isNumber(content)) {
+    return new EDNNumber(content)
+  }
+  if (isBoolean(content)) {
+    return new EDNBoolean(content)
+  }
+  
   return content
 }

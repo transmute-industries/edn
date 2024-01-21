@@ -13,8 +13,11 @@ it('unwrap map', () => {
 it('unwrap seq', () => {
   const diag = `["string", 0, false, ["deep", ["nested"]]]`
   const graph = unwrap(diag) as EDNSeq;
-  console.log(graph)
-  
+  expect(graph.get(0).value).toBe('string')
+  expect(graph.get(1).value).toBe(0)
+  expect(graph.get(2).value).toBe(false)
+  const entry2 = graph.get(3)
+  expect(entry2.entries[0].value).toBe('deep')
 })
 
 // it('handle wg repo examples', async ()=>{
