@@ -3,7 +3,9 @@
 
 
 
+import { diagnose } from "cbor"
 
+import * as coseAlgs from '../cose/alg'
 
 const isMap = (content: string) => content.startsWith('{') && content.endsWith('}')
 
@@ -33,7 +35,7 @@ const removeTag = (content: string) => {
   if (indexOfFirstParen === -1) {
     return content
   }
-  return content.slice(indexOfFirstParen+1, content.length - 1)
+  return content.slice(indexOfFirstParen + 1, content.length - 1)
 }
 
 const getSymbolBefore = (content: string, symbol: string) => {
@@ -90,7 +92,7 @@ const selectNextValue = (content: string) => {
 }
 
 class EDNBase {
-  public tag ?: number
+  public tag?: number
 }
 
 class EDNLabel extends EDNBase {
@@ -98,6 +100,8 @@ class EDNLabel extends EDNBase {
     super();
     if (`${label}`.startsWith('"')) {
       this.label = `${label}`.slice(1, `${label}`.length - 1)
+    } else {
+      this.label = parseInt(label as string, 10)
     }
   }
 }
@@ -125,7 +129,7 @@ export class EDNSeq extends EDNBase {
   }
 }
 
-class EDNBytes extends EDNBase{
+class EDNBytes extends EDNBase {
   public value: Buffer
   // h'facade'
   constructor(text: string) {
@@ -161,6 +165,31 @@ class EDNTextString extends EDNBase {
   }
 }
 
+export class EDNCoseSign1 {
+  public tag: number = 18
+  public seq: EDNSeq
+  public nested: any[] = []
+  constructor(seq: EDNSeq) {
+    this.seq = seq;
+  }
+  protectedHeader() {
+    return this.seq.get(0)
+  }
+
+  diagnoseNested = async () => {
+    const diag = await diagnose(this.protectedHeader().value)
+    const doc = await unwrap(diag.trim())
+    this.nested.push(doc)
+  }
+
+  signatureAlgorithm(){
+    const alg = this.nested[0].get(1)[1]
+    alg.comment = coseAlgs.algLabelToAlgName.get(alg.value)
+    return alg
+  }
+
+}
+
 const removeFirstComma = (text: string) => {
   if (text.trim().startsWith(',')) {
     return text.trim().slice(1)
@@ -168,7 +197,7 @@ const removeFirstComma = (text: string) => {
   return text.trim();
 }
 
-const unwrapSeq = (content: string) => {
+const unwrapSeq = async (content: string) => {
   if (!isSeq(content)) {
     throw new Error('unwrapSeq called on non seq')
   }
@@ -177,7 +206,7 @@ const unwrapSeq = (content: string) => {
   while (unwrapped.length) {
     const value = selectNextValue(unwrapped)
     if (value.length) {
-      seq.add(unwrap(value))
+      seq.add(await unwrap(value))
       unwrapped = unwrapped.replace(value, '')
     }
     unwrapped = removeFirstComma(unwrapped)
@@ -185,7 +214,7 @@ const unwrapSeq = (content: string) => {
   return seq;
 }
 
-const unwrapMap = (content: string) => {
+const unwrapMap = async (content: string) => {
   if (!isMap(content)) {
     throw new Error('unwrapMap called on non map')
   }
@@ -196,7 +225,7 @@ const unwrapMap = (content: string) => {
     unwrapped = unwrapped.replace(`${label}: `, '').trim()
     const value = selectNextValue(unwrapped)
     if (value.length) {
-      map.add(new EDNLabel(label), unwrap(value))
+      map.add(new EDNLabel(label), await unwrap(value))
       unwrapped = unwrapped.replace(value, '')
       unwrapped = removeFirstComma(unwrapped)
     }
@@ -204,16 +233,30 @@ const unwrapMap = (content: string) => {
   return map;
 }
 
-export const unwrap = (content: string) => {
+
+const postProcessCoseSign1 = async (data: EDNSeq) => {
+  const signature = new EDNCoseSign1(data)
+  await signature.diagnoseNested();
+  return signature;
+}
+
+const postProcessByTag = async (data: EDNBase) => {
+  if (data.tag === 18) {
+    return postProcessCoseSign1(data as EDNSeq)
+  }
+  return data;
+}
+
+export const unwrap = async (content: string) => {
   let data;
   let tag = getTag(content)
   if (tag) {
     content = removeTag(content)
   }
   if (isMap(content)) {
-    data = unwrapMap(content)
+    data = await unwrapMap(content)
   } else if (isSeq(content)) {
-    data = unwrapSeq(content)
+    data = await unwrapSeq(content)
   } else if (isBytes(content)) {
     data = new EDNBytes(content)
   } else if (isTextString(content)) {
@@ -222,13 +265,12 @@ export const unwrap = (content: string) => {
     data = new EDNNumber(content)
   } else if (isBoolean(content)) {
     data = new EDNBoolean(content)
-  }
-  if (data && tag){
-    data.tag = parseInt(tag, 10)
-  }
-  if (data === undefined){
+  } else {
     throw new Error('Failed to parse EDN for ' + content)
   }
- 
+  if (data && tag) {
+    data.tag = parseInt(tag, 10)
+    return await postProcessByTag(data)
+  }
   return data
 }
