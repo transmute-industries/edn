@@ -63,6 +63,9 @@ const selectBoundedText = (content: string, start: string, end: string) => {
 
 const selectNextValue = (content: string) => {
   content = removeFirstComma(content)
+  if (content.startsWith('{')) {
+    return selectBoundedText(content, '{', '}')
+  }
   if (content.startsWith('[')) {
     return selectBoundedText(content, '[', ']')
   }
@@ -86,20 +89,24 @@ const selectNextValue = (content: string) => {
   throw new Error('Unknown content: ' + content)
 }
 
-class EDNLabel {
+class EDNBase {
+  public tag ?: number
+}
+
+class EDNLabel extends EDNBase {
   constructor(public label: string | number) {
+    super();
     if (`${label}`.startsWith('"')) {
       this.label = `${label}`.slice(1, `${label}`.length - 1)
     }
   }
 }
 
-export class EDNMap {
+export class EDNMap extends EDNBase {
   public entries = [] as any[]
   add(key: any, value: any) {
     this.entries.push([key, value])
   }
-
   get(label: string | number) {
     const entry = this.entries.find(([k, v]) => {
       return k.label === label
@@ -108,7 +115,7 @@ export class EDNMap {
   }
 }
 
-export class EDNSeq {
+export class EDNSeq extends EDNBase {
   public entries = [] as any[]
   add(value: any) {
     this.entries.push(value)
@@ -118,34 +125,36 @@ export class EDNSeq {
   }
 }
 
-class EDNBytes {
+class EDNBytes extends EDNBase{
   public value: Buffer
   // h'facade'
   constructor(text: string) {
+    super();
     this.value = Buffer.from(text.split(`'`)[1], 'hex')
   }
 }
 
-class EDNNumber {
+class EDNNumber extends EDNBase {
   public value: number
   // h'facade'
   constructor(value: string) {
+    super();
     this.value = parseInt(value, 10)
   }
 }
 
-class EDNBoolean {
+class EDNBoolean extends EDNBase {
   public value: boolean
   // h'facade'
   constructor(value: string) {
+    super();
     this.value = value === 'true'
   }
 }
 
-
-
-class EDNTextString {
+class EDNTextString extends EDNBase {
   constructor(public value: string) {
+    super();
     if (`${value}`.startsWith('"')) {
       this.value = `${value}`.slice(1, `${value}`.length - 1)
     }
@@ -214,6 +223,8 @@ export const unwrap = (content: string) => {
   } else if (isBoolean(content)) {
     data = new EDNBoolean(content)
   }
-
+  if (data && tag){
+    data.tag = parseInt(tag, 10)
+  }
   return data
 }
