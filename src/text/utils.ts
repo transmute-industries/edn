@@ -20,6 +20,22 @@ const isBoolean = (content: string) => {
   return ['true', 'false'].includes(content)
 }
 
+const getTag = (content: string) => {
+  const indexOfFirstParen = content.indexOf('(')
+  if (indexOfFirstParen === -1) {
+    return undefined
+  }
+  return content.slice(0, indexOfFirstParen)
+}
+
+const removeTag = (content: string) => {
+  const indexOfFirstParen = content.indexOf('(')
+  if (indexOfFirstParen === -1) {
+    return content
+  }
+  return content.slice(indexOfFirstParen+1, content.length - 1)
+}
+
 const getSymbolBefore = (content: string, symbol: string) => {
   let indexOfSymbol = content.indexOf(symbol);
   if (indexOfSymbol === -1) {
@@ -72,8 +88,8 @@ const selectNextValue = (content: string) => {
 
 class EDNLabel {
   constructor(public label: string | number) {
-    if (`${label}`.startsWith('"')){
-      this.label = `${label}`.slice(1, `${label}`.length-1)
+    if (`${label}`.startsWith('"')) {
+      this.label = `${label}`.slice(1, `${label}`.length - 1)
     }
   }
 }
@@ -84,8 +100,8 @@ export class EDNMap {
     this.entries.push([key, value])
   }
 
-  get(label: string | number){
-    const entry = this.entries.find(([k, v])=>{
+  get(label: string | number) {
+    const entry = this.entries.find(([k, v]) => {
       return k.label === label
     })
     return entry
@@ -97,7 +113,7 @@ export class EDNSeq {
   add(value: any) {
     this.entries.push(value)
   }
-  get(index: number){
+  get(index: number) {
     return this.entries[index]
   }
 }
@@ -130,8 +146,8 @@ class EDNBoolean {
 
 class EDNTextString {
   constructor(public value: string) {
-    if (`${value}`.startsWith('"')){
-      this.value = `${value}`.slice(1, `${value}`.length-1)
+    if (`${value}`.startsWith('"')) {
+      this.value = `${value}`.slice(1, `${value}`.length - 1)
     }
   }
 }
@@ -180,24 +196,24 @@ const unwrapMap = (content: string) => {
 }
 
 export const unwrap = (content: string) => {
+  let data;
+  let tag = getTag(content)
+  if (tag) {
+    content = removeTag(content)
+  }
   if (isMap(content)) {
-    return unwrapMap(content)
+    data = unwrapMap(content)
+  } else if (isSeq(content)) {
+    data = unwrapSeq(content)
+  } else if (isBytes(content)) {
+    data = new EDNBytes(content)
+  } else if (isTextString(content)) {
+    data = new EDNTextString(content)
+  } else if (isNumber(content)) {
+    data = new EDNNumber(content)
+  } else if (isBoolean(content)) {
+    data = new EDNBoolean(content)
   }
-  if (isSeq(content)) {
-    return unwrapSeq(content)
-  }
-  if (isBytes(content)) {
-    return new EDNBytes(content)
-  }
-  if (isTextString(content)) {
-    return new EDNTextString(content)
-  }
-  if (isNumber(content)) {
-    return new EDNNumber(content)
-  }
-  if (isBoolean(content)) {
-    return new EDNBoolean(content)
-  }
-  
-  return content
+
+  return data
 }
