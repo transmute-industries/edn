@@ -4,8 +4,8 @@ import * as edn from '../src'
 
 const testCase = JSON.parse(fs.readFileSync('./src/__fixtures__/ecdsa-examples/ecdsa-sig-02.json').toString())
 
-it(testCase.title, () => {
+it(testCase.title, async () => {
   const { cbor_diag } = testCase.output
-  const graph = edn.unwrap(cbor_diag)
-  console.log(graph)
+  const graph = await edn.parse(cbor_diag) as edn.EDNSeq
+  expect(graph.get(0).value.toString('hex')).toBe('a1013822')
 })
