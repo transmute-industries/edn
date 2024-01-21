@@ -10,6 +10,57 @@ export type Sequence = any[]
 
 export type MapLike = Map<any, any>
 
+export const getMapKeyFromLabel = (map: MapLike, label: any) => {
+  const entries = map.entries();
+  for (const [k, v] of entries){
+    if (k.get('label') === label){
+      return v
+    }
+  }
+  return null
+}
+
+export class EDN {
+  constructor(public tag?: number){}
+}
+
+export class EDNString extends EDN {
+  constructor(public value: string, tag?: number){
+    super(tag)
+  }
+}
+export class EDNInteger extends EDN {
+  constructor(public value: number, tag?: number){
+    super(tag)
+  }
+}
+export class EDNBoolean extends EDN {
+  constructor(public value: boolean, tag?: number){
+    super(tag)
+  }
+}
+
+export class EDNBytes extends EDN {
+  constructor(public value: Buffer, tag?: number){
+    super(tag)
+  }
+}
+
+export class EDNSequence extends EDN {
+  constructor(public sequence: Sequence, tag?: number){
+    super(tag)
+  }
+}
+
+export class EDNMap extends EDN {
+  constructor(public map: MapLike, tag?: number){
+    super(tag)
+  }
+  getLabel = (label: string | number) =>{
+    return getMapKeyFromLabel(this.map, label)
+  }
+}
+
 const selectValue = (content: string) => {
   if (content.startsWith('[')) {
     return selectSequence(content)
@@ -58,31 +109,24 @@ const selectSequence = (content: string) => {
     } else {
       depth--;
     }
-
   }
   return `[${sequence}`;
 }
 
-
-
 export const extractStringNodeContent = (content: string, map: Map<any, any> = new Map()) => {
-  map.set('label', content.slice(1, content.length - 1).trim())
-  return map
+  return new EDNString(content.slice(1, content.length - 1).trim())
 }
 
 export const extractBooleanNodeContent = (content: string, map: Map<any, any> = new Map()) => {
-  map.set('label', content === 'true')
-  return map
+  return new EDNBoolean(content === 'true')
 }
 
 export const extractIntegerNodeContent = (content: string, map: Map<any, any> = new Map()) => {
-  map.set('label', parseInt(content, 10))
-  return map
+  return new EDNInteger(parseInt(content, 10))
 }
 
 export const extractBytesContent = (content: string, map: Map<any, any> = new Map()) => {
-  map.set('label', Buffer.from(content.split(`'`)[1], 'hex'))
-  return map
+  return new EDNBytes(Buffer.from(content.split(`'`)[1], 'hex'))
 }
 
 export const extractContent = (content: string) => {
@@ -120,7 +164,7 @@ const getSequenceDepth = (content: string, start: string, end: string) => {
     } else if (content[i] === end) {
       depth--
     } else {
-      if (!map[`depth_${depth}`]) {
+      if (map[`depth_${depth}`] === undefined) {
         map[`depth_${depth}`] = ''
       }
       map[`depth_${depth}`] += content[i]
@@ -132,6 +176,7 @@ const getSequenceDepth = (content: string, start: string, end: string) => {
 // terrible
 const extractSequenceNodeContent = (content: string): any => {
   let sequenceDepth = getSequenceDepth(content, '[', ']')
+  console.log(sequenceDepth)
   let sequence = [...sequenceDepth['depth_0'].split(',').map((i: any) => i.trim()).filter((i: any) => !!i).map((extractContent))] as any;
   const contentWithoutDepth0 = content.replace(sequenceDepth['depth_0'], '')
   if (contentWithoutDepth0.length) {
@@ -140,6 +185,7 @@ const extractSequenceNodeContent = (content: string): any => {
       return [...sequence, remaining]
     }
   }
+  console.log(sequence)
   return sequence
 }
 
@@ -163,7 +209,9 @@ export const extractMapNodeContent = (content: string, map: Map<any, any> = new 
     ednKey.set('label', nextKey.slice(1, nextKey.length - 1).trim())
     const ednValue = extractContent(nextValue);
     map.set(ednKey, ednValue)
+ 
     innerContent = removeCommaPrefix(nextValueAndRest.slice(nextValueAndRest.indexOf(nextValue) + nextValue.length).trim())
+   
     if (lastInnerContent === innerContent) {
       break
     } else {
@@ -173,22 +221,17 @@ export const extractMapNodeContent = (content: string, map: Map<any, any> = new 
   return map;
 }
 
-export function parse<T>(edn: string) {
+export function parse<T>(edn: string): T {
   const trimmed = edn.trim();
-  if (trimmed.startsWith('{')) {
-    return extractMapNodeContent(trimmed) as T
+  if (trimmed.startsWith('18(')){
+    const seq = extractSequenceNodeContent(trimmed.slice(3, trimmed.length-1))
+    return new EDNSequence(seq, 18) as T
+  } else if (trimmed.startsWith('{')) {
+    const map = extractMapNodeContent(trimmed)
+    return new EDNMap(map, undefined) as T
   } else if (trimmed.startsWith('[')) {
-    return extractSequenceNodeContent(trimmed) as T
+    const seq = extractSequenceNodeContent(trimmed)
+    return new EDNSequence(seq, 18) as T
   }
   throw new Error('can only be called on maps or sequences')
-}
-
-export const getMapKeyFromLabel = (map: MapLike, label: any) => {
-  const entries = map.entries();
-  for (const [k, v] of entries){
-    if (k.get('label') === label){
-      return v
-    }
-  }
-  return null
 }
