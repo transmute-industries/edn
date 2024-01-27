@@ -1,2 +1,2 @@
 .github
-src/*
+./src/__fixtures__
