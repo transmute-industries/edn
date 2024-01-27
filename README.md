@@ -11,7 +11,10 @@
 
 🚧 Experimental 🔥
 
+This package generates HTML in a naive manner that could lead to XSS.
+
 <img src="./transmute-banner.png" />
+
 
 #### [Questions? Contact Transmute](https://transmute.typeform.com/to/RshfIw?typeform-source=edn)
 
