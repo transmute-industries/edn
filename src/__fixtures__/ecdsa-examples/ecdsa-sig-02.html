@@ -3,11 +3,13 @@
   
     .edn-cose-sign1 { font-family: monospace; }
     .edn-cose-sign1 * { margin: 0; padding: 0; } 
+    .edn-cose-sign1 dt { padding-right: 8px;}
     .edn-cose-sign1 dt, dd { display: inline-block; padding-left: 8px; }
     .edn-cose-sign1 ol li {
       list-style: none;
       padding-left: 8px;
     }
+    .decoded-nested { margin: 8px }
 
   </style>
 
@@ -19,8 +21,8 @@
 ])
 
 
-    <section>
-{<dl><dt>/ alg / 1 : </dt><dd>-35</dd><dl>}
+    <section class="decoded-nested">
+/ protected / {<dl><dt>/ alg / 1 : </dt><dd>/ ES384 / -35 </dd><dl>}
     </section>
     
 

@@ -21,16 +21,20 @@ const renderSeq = (seq: EDNSeq) => {
 
 const renderMap = (map: EDNMap) => {
   const rows = map.entries.map(([key, value])=>{
-    let edn = value.edn;
-    if (!edn){
-      edn = recursiveRender(value)
+    let htmlValue = value.edn;
+    if (!htmlValue){
+      htmlValue = recursiveRender(value)
     }
     let htmlKey = `${key.label}: `
     if (key.iana){
       const iana = key.iana as IANACOSEHeaderParameter
       htmlKey = `/ ${iana.Name} / ${iana.Label} : `
     }
-    return `<dt>${htmlKey}</dt><dd>${edn}</dd>`
+    if (value.iana){
+      const iana = value.iana as IANACOSEHeaderParameter
+      htmlValue = `/ ${iana.Name} / ${value.edn} `
+    }
+    return `<dt>${htmlKey}</dt><dd>${htmlValue}</dd>`
   })
   let mapComment = ''
   if (map.comment){
@@ -53,18 +57,20 @@ const recursiveRender = (graph: EDNSeq | EDNMap): string => {
 const style = `
     .edn-cose-sign1 { font-family: monospace; }
     .edn-cose-sign1 * { margin: 0; padding: 0; } 
+    .edn-cose-sign1 dt { padding-right: 8px;}
     .edn-cose-sign1 dt, dd { display: inline-block; padding-left: 8px; }
     .edn-cose-sign1 ol li {
       list-style: none;
       padding-left: 8px;
     }
+    .decoded-nested { margin: 8px }
 `
 
 const recursiveRenderNested = (graph:EDNCoseSign1): string => {
   const items = [] as string[]
   for (const item of graph.nested){
     items.push(`
-    <section>
+    <section class="decoded-nested">
 ${recursiveRender(item)}
     </section>
     `)

@@ -5,7 +5,7 @@
 
 import { diagnose } from "cbor"
 
-import * as coseAlgs from '../cose/alg'
+import * as algs from '../cose/alg'
 
 import * as headers from '../cose/headers'
 
@@ -220,6 +220,7 @@ export class EDNCoseSign1 {
   }
   comment  = async () => {
     const protectedHeader = this.protectedHeader()
+  
     const unprotectedHeader = await this.unprotectedHeader()
 
     await this.payload()
@@ -227,11 +228,15 @@ export class EDNCoseSign1 {
 
     const diag = await diagnose(protectedHeader.value)
     const doc = await unwrap(diag.trim()) as EDNMap
+    doc.comment = 'protected'
 
     for (const [key, value] of doc.entries){
       const ianaRegisteredHeader = headers.IANACOSEHeaderParameters[`${key.label}`]
       if (ianaRegisteredHeader){
         key.iana = ianaRegisteredHeader;
+        if (key.iana.Name === 'alg'){
+          value.iana = algs.IANACOSEHeaderParameters[`${value.value}`]
+        }
       }
     }
     this.nested.push(doc)
