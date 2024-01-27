@@ -1,5 +1,5 @@
 {
-  "name": "@transmute/edn-graph",
+  "name": "@transmute/edn",
   "version": "0.0.1",
   "description": "Experimental",
   "main": "./dist/index.js",
@@ -24,14 +24,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/transmute-industries/edn-graph.git"
+    "url": "git+https://github.com/transmute-industries/edn.git"
   },
   "author": "Orie Steele",
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/transmute-industries/edn-graph/issues"
+    "url": "https://github.com/transmute-industries/edn/issues"
   },
-  "homepage": "https://github.com/transmute-industries/edn-graph#readme",
+  "homepage": "https://github.com/transmute-industries/edn#readme",
   "devDependencies": {
     "@types/jest": "^29.2.4",
     "@typescript-eslint/eslint-plugin": "^5.47.1",
