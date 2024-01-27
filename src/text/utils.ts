@@ -7,6 +7,8 @@ import { diagnose } from "cbor"
 
 import * as coseAlgs from '../cose/alg'
 
+import * as headers from '../cose/headers'
+
 const isMap = (content: string) => content.startsWith('{') && content.endsWith('}')
 
 const isSeq = (content: string) => content.startsWith('[') && content.endsWith(']')
@@ -91,8 +93,21 @@ const selectNextValue = (content: string) => {
   throw new Error('Unknown content: ' + content)
 }
 
+
+export const bufferToTruncatedBstr = (thing: ArrayBuffer | Buffer | any) => {
+  if (thing === null) {
+    return 'nil'
+  }
+  const buf = Buffer.from(thing)
+  const line = `h'${buf.toString('hex').toLowerCase()}'`
+  return line.replace(/h'(.{8}).+(.{8})'/g, `h'$1...$2'`).trim()
+}
+
+
 class EDNBase {
   public tag?: number
+  public edn?: string
+  public comment?: string
 }
 
 class EDNLabel extends EDNBase {
@@ -135,6 +150,8 @@ class EDNBytes extends EDNBase {
   constructor(text: string) {
     super();
     this.value = Buffer.from(text.split(`'`)[1], 'hex')
+    // we want ellide all long byte strings
+    this.edn = bufferToTruncatedBstr(this.value)
   }
 }
 
@@ -144,6 +161,7 @@ class EDNNumber extends EDNBase {
   constructor(value: string) {
     super();
     this.value = parseInt(value, 10)
+    this.edn = value
   }
 }
 
@@ -153,6 +171,7 @@ class EDNBoolean extends EDNBase {
   constructor(value: string) {
     super();
     this.value = value === 'true'
+    this.edn = value
   }
 }
 
@@ -161,6 +180,7 @@ class EDNTextString extends EDNBase {
     super();
     if (`${value}`.startsWith('"')) {
       this.value = `${value}`.slice(1, `${value}`.length - 1)
+      this.edn = value
     }
   }
 }
@@ -173,19 +193,48 @@ export class EDNCoseSign1 {
     this.seq = seq;
   }
   protectedHeader() {
-    return this.seq.get(0)
+    const header =  this.seq.get(0)
+    header.edn = `/ protected / ${header.edn}`
+    return header
   }
+  unprotectedHeader() {
+    const unprotected =  this.seq.get(1)
+    unprotected.comment = 'unprotected'
+    for (const [key, value] of unprotected.entries){
+      const ianaRegisteredHeader = headers.IANACOSEHeaderParameters[`${key.label}`]
+      if (ianaRegisteredHeader){
+        key.iana = ianaRegisteredHeader;
+      }
+    }
+    return unprotected
+  }
+  payload() {
+    const payload =  this.seq.get(2)
+    payload.edn = `/ payload / ${payload.edn}`
+    return payload
+  }
+  signature() {
+    const signature =  this.seq.get(3)
+    signature.edn = `/ signature / ${signature.edn}`
+    return signature
+  }
+  comment  = async () => {
+    const protectedHeader = this.protectedHeader()
+    const unprotectedHeader = await this.unprotectedHeader()
 
-  diagnoseNested = async () => {
-    const diag = await diagnose(this.protectedHeader().value)
-    const doc = await unwrap(diag.trim())
+    await this.payload()
+    await this.signature()
+
+    const diag = await diagnose(protectedHeader.value)
+    const doc = await unwrap(diag.trim()) as EDNMap
+
+    for (const [key, value] of doc.entries){
+      const ianaRegisteredHeader = headers.IANACOSEHeaderParameters[`${key.label}`]
+      if (ianaRegisteredHeader){
+        key.iana = ianaRegisteredHeader;
+      }
+    }
     this.nested.push(doc)
-  }
-
-  signatureAlgorithm(){
-    const alg = this.nested[0].get(1)[1]
-    alg.comment = coseAlgs.algLabelToAlgName.get(alg.value)
-    return alg
   }
 
 }
@@ -236,7 +285,7 @@ const unwrapMap = async (content: string) => {
 
 const postProcessCoseSign1 = async (data: EDNSeq) => {
   const signature = new EDNCoseSign1(data)
-  await signature.diagnoseNested();
+  await signature.comment();
   return signature;
 }
 
