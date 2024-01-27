@@ -88,8 +88,6 @@ export const render = async (message: Buffer, contentType: string = 'text/html')
   }
   const id = urn('cose', 'cose-sign1', message);
 
-  console.log(graph)
-
   return `
 
 <section id="${id}" class="edn-cose-sign1">
