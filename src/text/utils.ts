@@ -20,6 +20,11 @@ const isNumber = (content: string) => {
   return `${parseInt(content, 10)}` === content
 }
 
+
+const isNull = (content: string) => {
+  return `null` === content
+}
+
 const isBoolean = (content: string) => {
   return ['true', 'false'].includes(content)
 }
@@ -87,9 +92,10 @@ const selectNextValue = (content: string) => {
   if (`${parseInt(untilComma, 10)}` === untilComma) {
     return untilComma;
   }
-  if (['true', 'false'].includes(untilComma)) {
+  if (['true', 'false', 'null'].includes(untilComma)) {
     return untilComma;
   }
+
   throw new Error('Unknown content: ' + content)
 }
 
@@ -154,6 +160,16 @@ class EDNBytes extends EDNBase {
     this.edn = bufferToTruncatedBstr(this.value)
   }
 }
+
+class EDNNull extends EDNBase {
+  public value: null
+  constructor(text: string) {
+    super();
+    this.value = null
+    this.edn = 'nil'
+  }
+}
+
 
 class EDNNumber extends EDNBase {
   public value: number
@@ -315,6 +331,8 @@ export const unwrap = async (content: string) => {
     data = new EDNBytes(content)
   } else if (isTextString(content)) {
     data = new EDNTextString(content)
+  } else if (isNull(content)) {
+    data = new EDNNull(content)
   } else if (isNumber(content)) {
     data = new EDNNumber(content)
   } else if (isBoolean(content)) {
