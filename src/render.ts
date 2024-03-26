@@ -113,10 +113,10 @@ export const renderPlaintext = async (id: string, graph: EDNCoseSign1): Promise<
     if (graph.tag !== 18) {
         throw new Error('Unsupported graph type for plaintext rendering.');
     }
-    let plaintext: string = `18(\n   [\n`;
+    let plaintext: string = `/ cose-sign1 / 18([\n`;
     // Start with an initial indentation level of 2 for consistent formatting
     plaintext += recursiveRenderPlaintext(graph.seq);
-    plaintext += '\n   ]\n)\n\n';
+    plaintext += '\n])\n\n';
 
     // TODO: decode the nested protected header in place
     // if (graph.nested && graph.nested.length > 0) {
@@ -160,5 +160,5 @@ const renderMapPlaintext = (map: EDNMap): string => {
         return `\n\t\t${formattedKey} ${formattedValue}`;
     });
     let mapComment: string = map.comment ? `\t/ ${map.comment} / ` : '';
-    return mapComment + components.join('\n');
+    return mapComment + '{' + components.join('\n') + '\n\t}';
 };
