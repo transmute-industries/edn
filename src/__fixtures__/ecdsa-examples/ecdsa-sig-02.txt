@@ -1,7 +1,9 @@
 / cose-sign1 / 18([
-	/ protected / h'a1013822',
+	/ protected / << {
+		/ alg / 1 : -35 / ES384 /
+	} >>>,
 	/ unprotected / {
-		/ kid / 4 :  h'50333834'
+		/ kid / 4 : h'50333834'
 	},
 	/ payload / h'54686973...656e742e',
 	/ signature / h'5f150abd...59622a3c'

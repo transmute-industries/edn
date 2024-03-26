@@ -1,10 +1,14 @@
-import {EDNCoseSign1, EDNMap, EDNSeq} from "./text";
+import { EDNCoseSign1, EDNMap, EDNSeq } from "./text";
 
-import {parse} from "./parse";
+import { parse } from "./parse";
 
-import {urn} from "./identifiers";
+import { urn } from "./identifiers";
 
-import {IANACOSEHeaderParameter} from "./cose/headers";
+import { IANACOSEHeaderParameter } from "./cose/headers";
+
+import * as headers from './cose/headers'
+import * as algs from './cose/alg'
+
 
 export const render = async (message: Buffer, contentType: string = 'text/html') => {
     const graph = await parse(message) as EDNCoseSign1
@@ -114,8 +118,7 @@ export const renderPlaintext = async (id: string, graph: EDNCoseSign1): Promise<
         throw new Error('Unsupported graph type for plaintext rendering.');
     }
     let plaintext: string = `/ cose-sign1 / 18([\n`;
-    // Start with an initial indentation level of 2 for consistent formatting
-    plaintext += recursiveRenderPlaintext(graph.seq);
+    plaintext += await recursiveRenderPlaintext(graph.seq);
     plaintext += '\n])\n\n';
 
     // TODO: decode the nested protected header in place
@@ -127,38 +130,53 @@ export const renderPlaintext = async (id: string, graph: EDNCoseSign1): Promise<
     return plaintext.trim();
 };
 
-const recursiveRenderPlaintext = (graph: EDNSeq | EDNMap): string => {
+const recursiveRenderPlaintext = async (graph: EDNSeq | EDNMap): Promise<string> => {
     if (graph instanceof EDNSeq) {
-        return renderSeqPlaintext(graph);
+        return await renderSeqPlaintext(graph);
     } else if (graph instanceof EDNMap) {
-        return renderMapPlaintext(graph);
+        return await renderMapPlaintext(graph);
     } else {
         console.error("Unsupported graph instance:", graph);
         throw new Error("Unsupported graph instance for plaintext rendering.");
     }
 };
 
-const renderSeqPlaintext = (seq: EDNSeq): string => {
-    return seq.entries.map((entry, index: number) => {
-        let trailingComma: string = index < seq.entries.length - 1 ? ',' : '';
-        return `${entry.edn ? '\t' + entry.edn : recursiveRenderPlaintext(entry)}${trailingComma}`;
-    }).join('\n');
+const renderSeqPlaintext = async (seq: EDNSeq): Promise<string> => {
+    return (
+        await Promise.all(
+            seq.entries.map(async (entry, index: number) => {
+                let trailingComma: string = index < seq.entries.length - 1 ? ',' : '';
+                if (entry.edn && entry.edn.startsWith('/ protected /')) {
+                    const protectedHeader = (await parse(entry.value) as EDNMap);
+                    for (const [key, value] of protectedHeader.entries) {
+                        const ianaRegisteredHeader = headers.IANACOSEHeaderParameters[`${key.label}`]
+                        if (ianaRegisteredHeader) {
+                            key.iana = ianaRegisteredHeader;
+                        }
+                        if (key.iana.Name === 'alg') {
+                            value.iana = algs.IANACOSEHeaderParameters[`${value.value}`]
+                        }
+                    }
+                    entry.edn = `/ protected / << ${await renderMapPlaintext(protectedHeader)} >>>`
+                }
+                return `${entry.edn ? '\t' + entry.edn : await recursiveRenderPlaintext(entry)}${trailingComma}`;
+            }))).join('\n');
 };
 
-const renderMapPlaintext = (map: EDNMap): string => {
-    let components: string[] = map.entries.map(([key, value]) => {
+const renderMapPlaintext = async (map: EDNMap): Promise<string> => {
+    let components: string[] = await Promise.all(map.entries.map(async ([key, value]) => {
         let formattedKey: string = key.label;
-        let formattedValue: string = value.edn || recursiveRenderPlaintext(value);
+        let formattedValue: string = value.edn || await recursiveRenderPlaintext(value);
         if (key.iana) {
             const iana = key.iana;
-            formattedKey = `/ ${iana.Name} / ${iana.Label} : `;
+            formattedKey = `/ ${iana.Name} / ${iana.Label} :`;
         }
         if (value.iana) {
             const iana = value.iana;
-            formattedValue = `/ ${iana.Name} / ${value.edn} `;
+            formattedValue = `${value.edn.trim()} / ${iana.Name} /`;
         }
         return `\n\t\t${formattedKey} ${formattedValue}`;
-    });
+    }));
     let mapComment: string = map.comment ? `\t/ ${map.comment} / ` : '';
     return mapComment + '{' + components.join('\n') + '\n\t}';
 };
