@@ -16,7 +16,6 @@ const isNumber = (content: string) => {
   return `${parseInt(content, 10)}` === content
 }
 
-
 const isNull = (content: string) => {
   return `null` === content
 }

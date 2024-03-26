@@ -60,7 +60,7 @@ const renderSeqPlaintext = async (seq: EDNSeq): Promise<string> => {
                     }
                     entry.edn = `/ protected / << ${await renderMapPlaintext(protectedHeader)} >>>`
                 }
-                return `${entry.edn ? '\t' + entry.edn : await recursiveRenderPlaintext(entry)}${trailingComma}`;
+                return `${entry.edn ? '  ' + entry.edn : await recursiveRenderPlaintext(entry)}${trailingComma}`;
             }))).join('\n');
 };
 
@@ -76,8 +76,8 @@ const renderMapPlaintext = async (map: EDNMap): Promise<string> => {
             const iana = value.iana;
             formattedValue = `${value.edn.trim()} / ${iana.Name} /`;
         }
-        return `\n\t\t${formattedKey} ${formattedValue}`;
+        return `\n    ${formattedKey} ${formattedValue}`;
     }));
-    let mapComment: string = map.comment ? `\t/ ${map.comment} / ` : '';
-    return mapComment + '{' + components.join('\n') + '\n\t}';
+    let mapComment: string = map.comment ? `  / ${map.comment} / ` : '';
+    return mapComment + '{' + components.join('\n') + '\n  }';
 };
