@@ -1,12 +1,9 @@
-COSE-Sign1 Message ID: urn:ietf:params:cose:cose-sign1:sha-256:base64url:t-eQXtHHgwyH7hIuhnqwHIiPWpvXa4ZFPtRFo2dZWU8
-
-/ cose-sign1 / 18([
+18(
+   [
 	/ protected / h'a1013822',
 	/ unprotected / 
 		/ kid / 4 :  h'50333834',
 	/ payload / h'54686973...656e742e',
 	/ signature / h'5f150abd...59622a3c'
-])
-
-	/ protected / 
-		/ alg / 1 :  / ES384 / -35
+   ]
+)
