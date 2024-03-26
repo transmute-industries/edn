@@ -1,57 +1,101 @@
-import { EDNCoseSign1, EDNMap, EDNSeq } from "./text";
+import {EDNCoseSign1, EDNMap, EDNSeq} from "./text";
 
-import { parse } from "./parse";
+import {parse} from "./parse";
 
-import { urn } from "./identifiers";
+import {urn} from "./identifiers";
 
-import { IANACOSEHeaderParameter } from "./cose/headers";
+import {IANACOSEHeaderParameter} from "./cose/headers";
 
-const renderSeq = (seq: EDNSeq) => {
-  const rows = seq.entries.map((entry: any, index: number)=>{
-    let trailingComma = index === seq.entries.length -1 ? '': ','
-    let item = `<li>${entry.edn}${trailingComma}</li>`
-    if (!entry.edn){
-      item = `<li>${recursiveRender(entry)}${trailingComma}</li>`
+export const render = async (message: Buffer, contentType: string = 'text/html') => {
+    const graph = await parse(message) as EDNCoseSign1
+    if (graph.tag !== 18) {
+        throw new Error('Only tagged cose-sign1 are supported')
     }
-    return item
-  })
-  
-  return `<ol>${rows.join('\n')}</ol>`
+    const id = urn('cose', 'cose-sign1', message);
+    switch (contentType) {
+        case 'text/html':
+            return renderHtml(id, graph)
+        case 'text/plain':
+            return renderPlaintext(id, graph)
+        default:
+            throw new Error('Only text/html and text/plain are supported')
+    }
 }
 
-const renderMap = (map: EDNMap) => {
-  const rows = map.entries.map(([key, value])=>{
-    let htmlValue = value.edn;
-    if (!htmlValue){
-      htmlValue = recursiveRender(value)
-    }
-    let htmlKey = `${key.label}: `
-    if (key.iana){
-      const iana = key.iana as IANACOSEHeaderParameter
-      htmlKey = `/ ${iana.Name} / ${iana.Label} : `
-    }
-    if (value.iana){
-      const iana = value.iana as IANACOSEHeaderParameter
-      htmlValue = `/ ${iana.Name} / ${value.edn} `
-    }
-    return `<dt>${htmlKey}</dt><dd>${htmlValue}</dd>`
-  })
-  let mapComment = ''
-  if (map.comment){
-    mapComment = `/ ${map.comment} / `
-  }
-  return `${mapComment}{<dl>${rows.join('\n')}<dl>}`
+export const renderHtml = async (id: string, graph: EDNCoseSign1) => {
+    return `
+<section id="${id}" class="edn-cose-sign1">
+  <style>
+  ${style}
+  </style>
+
+/ cose-sign1 / 18([ 
+${recursiveRenderHtml(graph.seq)}
+])
+
+${recursiveRenderNestedHtml(graph)}
+
+<section>
+  `.trim();
 }
 
-const recursiveRender = (graph: EDNSeq | EDNMap): string => {
+const recursiveRenderNestedHtml = (graph: EDNCoseSign1): string => {
+    const items = [] as string[]
+    for (const item of graph.nested) {
+        items.push(`
+    <section class="decoded-nested">
+${recursiveRenderHtml(item)}
+    </section>
+    `)
+    }
+    return items.join('\n')
+}
 
-  if (graph instanceof EDNSeq){
-    return renderSeq(graph)
-  } else if (graph instanceof EDNMap){
-    return renderMap(graph)
-  }
-  console.error(graph);
-  throw new Error("unsupported graph instance")
+const renderSeqHtml = (seq: EDNSeq) => {
+    const rows = seq.entries.map((entry: any, index: number) => {
+        let trailingComma = index === seq.entries.length - 1 ? '' : ','
+        let item = `<li>${entry.edn}${trailingComma}</li>`
+        if (!entry.edn) {
+            item = `<li>${recursiveRenderHtml(entry)}${trailingComma}</li>`
+        }
+        return item
+    })
+
+    return `<ol>${rows.join('\n')}</ol>`
+}
+
+const renderMapHtml = (map: EDNMap) => {
+    const rows = map.entries.map(([key, value]) => {
+        let htmlValue = value.edn;
+        if (!htmlValue) {
+            htmlValue = recursiveRenderHtml(value)
+        }
+        let htmlKey = `${key.label}: `
+        if (key.iana) {
+            const iana = key.iana as IANACOSEHeaderParameter
+            htmlKey = `/ ${iana.Name} / ${iana.Label} : `
+        }
+        if (value.iana) {
+            const iana = value.iana as IANACOSEHeaderParameter
+            htmlValue = `/ ${iana.Name} / ${value.edn} `
+        }
+        return `<dt>${htmlKey}</dt><dd>${htmlValue}</dd>`
+    })
+    let mapComment = ''
+    if (map.comment) {
+        mapComment = `/ ${map.comment} / `
+    }
+    return `${mapComment}{<dl>${rows.join('\n')}<dl>}`
+}
+
+const recursiveRenderHtml = (graph: EDNSeq | EDNMap): string => {
+    if (graph instanceof EDNSeq) {
+        return renderSeqHtml(graph)
+    } else if (graph instanceof EDNMap) {
+        return renderMapHtml(graph)
+    }
+    console.error(graph);
+    throw new Error("unsupported graph instance")
 }
 
 const style = `
@@ -65,43 +109,56 @@ const style = `
     }
     .decoded-nested { margin: 8px }
 `
+export const renderPlaintext = async (id: string, graph: EDNCoseSign1): Promise<string> => {
+    if (graph.tag !== 18) {
+        throw new Error('Unsupported graph type for plaintext rendering.');
+    }
+    let plaintext: string = `18(\n   [\n`;
+    // Start with an initial indentation level of 2 for consistent formatting
+    plaintext += recursiveRenderPlaintext(graph.seq);
+    plaintext += '\n   ]\n)\n\n';
 
-const recursiveRenderNested = (graph:EDNCoseSign1): string => {
-  const items = [] as string[]
-  for (const item of graph.nested){
-    items.push(`
-    <section class="decoded-nested">
-${recursiveRender(item)}
-    </section>
-    `)
-  }
-  return items.join('\n')
-}
+    // TODO: decode the nested protected header in place
+    // if (graph.nested && graph.nested.length > 0) {
+    //     graph.nested.forEach((nestedGraph, index) => {
+    //         plaintext += recursiveRenderPlaintext(nestedGraph);
+    //     });
+    // }
+    return plaintext.trim();
+};
 
-export const render = async (message: Buffer, contentType: string = 'text/html') => {
-  const graph = await parse(message) as EDNCoseSign1
-  if (graph.tag !== 18){
-    throw new Error('Only tagged cose-sign1 are supported')
-  }
-  if (contentType !== 'text/html'){
-    throw new Error('Only text/html is supported')
-  }
-  const id = urn('cose', 'cose-sign1', message);
+const recursiveRenderPlaintext = (graph: EDNSeq | EDNMap): string => {
+    if (graph instanceof EDNSeq) {
+        return renderSeqPlaintext(graph);
+    } else if (graph instanceof EDNMap) {
+        return renderMapPlaintext(graph);
+    } else {
+        console.error("Unsupported graph instance:", graph);
+        throw new Error("Unsupported graph instance for plaintext rendering.");
+    }
+};
 
-  return `
+const renderSeqPlaintext = (seq: EDNSeq): string => {
+    return seq.entries.map((entry, index: number) => {
+        let trailingComma: string = index < seq.entries.length - 1 ? ',' : '';
+        return `${entry.edn ? '\t' + entry.edn : recursiveRenderPlaintext(entry)}${trailingComma}`;
+    }).join('\n');
+};
 
-<section id="${id}" class="edn-cose-sign1">
-  <style>
-  ${style}
-  </style>
-
-/ cose-sign1 / 18([ 
-${recursiveRender(graph.seq)}
-])
-
-${recursiveRenderNested(graph)}
-
-<section>
-  `.trim();
-
-}
+const renderMapPlaintext = (map: EDNMap): string => {
+    let components: string[] = map.entries.map(([key, value]) => {
+        let formattedKey: string = key.label;
+        let formattedValue: string = value.edn || recursiveRenderPlaintext(value);
+        if (key.iana) {
+            const iana = key.iana;
+            formattedKey = `/ ${iana.Name} / ${iana.Label} : `;
+        }
+        if (value.iana) {
+            const iana = value.iana;
+            formattedValue = `/ ${iana.Name} / ${value.edn} `;
+        }
+        return `\n\t\t${formattedKey} ${formattedValue}`;
+    });
+    let mapComment: string = map.comment ? `\t/ ${map.comment} / ` : '';
+    return mapComment + components.join('\n');
+};
