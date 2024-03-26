@@ -28,7 +28,17 @@ const document: edn.EDNCoseSign1 = await edn.parse(
   // or "18([h'A1013822', {4: h'5 ...
 )
 const message = Buffer.from("D28444A1013822A1044...02E9D91E9B7B59622A3C", "hex");
-const html = await edn.render(message, 'text/html')
+const text = await edn.render(message, 'application/cbor-diagnostic')
+// / cose-sign1 / 18([
+// 	/ protected / << {
+// 		/ alg / 1 : -35 / ES384 /
+// 	} >>>,
+// 	/ unprotected / {
+// 		/ kid / 4 : h'50333834'
+// 	},
+// 	/ payload / h'54686973...656e742e',
+// 	/ signature / h'5f150abd...59622a3c'
+// ])
 ```
 
 ## Develop
