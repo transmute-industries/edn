@@ -6,6 +6,7 @@ const testCase = JSON.parse(fs.readFileSync('./src/__fixtures__/ecdsa-examples/e
 
 it(testCase.title, async () => {
     const message = Buffer.from(testCase.output.cbor, 'hex');
-    const html = await edn.render(message, 'text/plain')
-    fs.writeFileSync(`./src/__fixtures__/ecdsa-examples/ecdsa-sig-02.txt`, html)
+    const text = await edn.render(message, 'application/cbor-diagnostic')
+    expect(text).toBe(fs.readFileSync(`./src/__fixtures__/ecdsa-examples/ecdsa-sig-02.txt`).toString())
+    fs.writeFileSync(`./src/__fixtures__/ecdsa-examples/ecdsa-sig-02.txt`, text)
 })
