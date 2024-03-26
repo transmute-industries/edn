@@ -3,10 +3,6 @@
 
 
 
-import { diagnose } from "cbor"
-
-import * as algs from '../cose/alg'
-
 import * as headers from '../cose/headers'
 
 const isMap = (content: string) => content.startsWith('{') && content.endsWith('}')
@@ -19,6 +15,7 @@ const isTextString = (content: string) => content.startsWith(`"`) && content.end
 const isNumber = (content: string) => {
   return `${parseInt(content, 10)}` === content
 }
+
 
 const isNull = (content: string) => {
   return `null` === content
@@ -220,6 +217,7 @@ export class EDNCoseSign1 {
       if (ianaRegisteredHeader){
         key.iana = ianaRegisteredHeader;
       }
+      // TODO: make sense of SCITT and SPICE headers
     }
     return unprotected
   }
@@ -234,27 +232,10 @@ export class EDNCoseSign1 {
     return signature
   }
   comment  = async () => {
-    const protectedHeader = this.protectedHeader()
-  
-    const unprotectedHeader = await this.unprotectedHeader()
-
+    await this.protectedHeader()
+    await this.unprotectedHeader()
     await this.payload()
     await this.signature()
-
-    const diag = await diagnose(protectedHeader.value)
-    const doc = await unwrap(diag.trim()) as EDNMap
-    doc.comment = 'protected'
-
-    for (const [key, value] of doc.entries){
-      const ianaRegisteredHeader = headers.IANACOSEHeaderParameters[`${key.label}`]
-      if (ianaRegisteredHeader){
-        key.iana = ianaRegisteredHeader;
-        if (key.iana.Name === 'alg'){
-          value.iana = algs.IANACOSEHeaderParameters[`${value.value}`]
-        }
-      }
-    }
-    this.nested.push(doc)
   }
 
 }
