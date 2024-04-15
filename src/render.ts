@@ -58,7 +58,7 @@ const renderSeqPlaintext = async (seq: EDNSeq): Promise<string> => {
                             value.iana = algs.IANACOSEHeaderParameters[`${value.value}`]
                         }
                     }
-                    entry.edn = `/ protected / << ${await renderMapPlaintext(protectedHeader)} >>>`
+                    entry.edn = `/ protected / << ${await renderMapPlaintext(protectedHeader)} >>`
                 }
                 return `${entry.edn ? '  ' + entry.edn : await recursiveRenderPlaintext(entry)}${trailingComma}`;
             }))).join('\n');
